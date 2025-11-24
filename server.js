@@ -8,9 +8,35 @@ const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const cors = require('cors');
+app.use(cors());
 
 // Parse JSON in request bodies
 app.use(express.json());
+
+//use express-session
+const session = require('express-session');
+app.use(session({
+  secret: process.env.SESSION_SECRET,  // Add to your .env
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: false,
+    maxAge: 24 * 60 * 60 * 1000  // 24 hours
+  }
+}));
+
+
+//get all products
+app.get('/api/products', async (req, res) =>{
+  try {
+    const rows = await db.query('SELECT * FROM product');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // Get all users (db test)
 app.get('/api/users', async (req, res) => {
@@ -62,22 +88,15 @@ app.post('/api/login', async (req, res) => {
   if (!validPassword) {
     return res.status(401).json({ error: 'password' });
   }
-  // Step 4: Create JWT token
-  const token = jwt.sign(
-    { id: user.user_id, email: user.email },  // Data to put in token
-    process.env.JWT_SECRET_KEY,              // Secret from your .env
-    { expiresIn: '24h' }                     // Token expires in 24 hours
-  );
+  // Create token
+  req.session.userId = user.user_id;
+  req.session.userEmail = user.email;
+  req.session.cart = [];
   
-  //Send token back to client
-  res.json({ 
-    token,
-    user: { id: user.user_id, email: user.email }
-  });
-  
-} catch (error) {
-  res.status(500).json({ error: error.message });
-}
+  res.json({ message: 'Login successful', user: { id: user.user_id, email: user.email } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
   
 
