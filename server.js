@@ -53,7 +53,7 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-//insert a new user (unhashed for now)
+//insert a new user
 app.post('/api/register', async (req, res) => {
   try {
     const{ email, password} = req.body;
