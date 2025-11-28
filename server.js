@@ -8,8 +8,13 @@ const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+
 const cors = require('cors');
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true  // Allow cookies
+}));
 
 // Parse JSON in request bodies
 app.use(express.json());
@@ -91,6 +96,7 @@ app.post('/api/login', async (req, res) => {
   // Create token
   req.session.userId = user.user_id;
   req.session.userEmail = user.email;
+  //shopping cart initialized
   req.session.cart = [];
   
   res.json({ message: 'Login successful', user: { id: user.user_id, email: user.email } });
@@ -98,8 +104,95 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-  
 
+//returns if user is logged in for frontend welcome message etc
+app.get('/api/auth/check', (req, res) => {
+  if (req.session.userId) {
+    // User is logged in
+    res.json({ 
+      loggedIn: true, 
+      user: { 
+        id: req.session.userId, 
+        email: req.session.userEmail
+      }
+    });
+  } else {
+    // Not logged in
+    res.json({ loggedIn: false });
+  }
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.json({ message: 'Logged out successfully' });
+  });
+});
+
+//shopping cart get and post
+
+//get the cart
+app.get('/api/cart', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  res.json({ cart: req.session.cart || [] });
+});
+
+//add to cart
+app.post('/api/cart/add', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  const { productId, name, price, quantity } = req.body;
+  // Check if item already exists in cart
+  const existingItem = req.session.cart.find(item => item.productId === productId);
+  if (existingItem) {
+    // Item exists - increase quantity
+    existingItem.quantity += quantity;
+  } else {
+    // New item - add to cart
+    req.session.cart.push({ productId, name, price, quantity });
+  }
+  
+  res.json({ cart: req.session.cart });
+});
+
+// PUT update quantity
+app.put('/api/cart/update', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  const { productId, quantity } = req.body;
+  
+  const item = req.session.cart.find(item => item.productId === productId);
+  
+  if (item) {
+    if (quantity <= 0) {
+      // Remove item if quantity is 0 or less
+      req.session.cart = req.session.cart.filter(item => item.productId !== productId);
+    } else {
+      item.quantity = quantity;
+    }
+  }
+  
+  res.json({ cart: req.session.cart });
+});
+
+// DELETE remove item from cart
+app.delete('/api/cart/remove/:productId', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  const productId = parseInt(req.params.productId);
+  req.session.cart = req.session.cart.filter(item => item.productId !== productId);
+  
+  res.json({ cart: req.session.cart });
+});
 
 // Start the server
 app.listen(PORT, () => {
